@@ -146,7 +146,7 @@ def joint_probability(people, one_gene, two_genes, have_trait):
         
         # GEN PROBABILITY
         gen_prob = 1
-        # init number of gen(es), = 0 by default
+        # init number of gen(es), = 0 by default for using later
         copies = 0
         # If have not parent
         mother = people[person]['mother']
@@ -168,7 +168,7 @@ def joint_probability(people, one_gene, two_genes, have_trait):
                     parent_dict[parent] *= 1 - PROBS["mutation"]
                 # ??? Case having 1 gene -> passing copy gen without mutation + passing non-copy gen with mutation
                 elif parent in one_gene:
-                    parent_dict[parent] *= 0.5 * (1 - PROBS["mutation"]) + 0.5 * PROBS["mutation"]
+                    parent_dict[parent] *= 0.5 * (1 - PROBS["mutation"]) #+ 0.5 * PROBS["mutation"]
                 # Case having 0 gene -> only passing via mutating
                 else:
                     parent_dict[parent] *= PROBS["mutation"]
@@ -188,7 +188,7 @@ def joint_probability(people, one_gene, two_genes, have_trait):
                 gen_prob *= (prob_1 + prob_2)
             # son has 0 gen, neither from father and mother
             else:
-                gen_prob = (1 - parent[mother])(1 - parent_dict[father])
+                gen_prob = (1 - parent_dict[mother]) * (1 - parent_dict[father]) 
 
         # TRAIT PROBABILITY base on number of gen(es)
         trait_prob = 1
@@ -210,16 +210,39 @@ def update(probabilities, one_gene, two_genes, have_trait, p):
     Which value for each distribution is updated depends on whether
     the person is in `have_gene` and `have_trait`, respectively.
     """
-    raise NotImplementedError
+    # update person is in one gene 
+    for person in one_gene:
+        probabilities[person]['gene'][1] += p
+    
+    # update person is in two gene
+    for person in two_genes:
+        probabilities[person]['gene'][2] += p
 
+    # update person have trait
+    for person in have_trait:
+        probabilities[person]['trait'][True] += p
 
 def normalize(probabilities):
     """
     Update `probabilities` such that each probability distribution
     is normalized (i.e., sums to 1, with relative proportions the same).
     """
-    raise NotImplementedError
+    # Loop over each person
+    for person in probabilities:
+        # normalize by finding normalizing constant factor alpha
+        for attribute in probabilities[person]:
+            # finding normalizing constant factor alpha
+            sum = 0
+            for type in probabilities[person][attribute]:
+                sum += probabilities[person][attribute][type]
 
+            if sum == 0:
+                sum = 1
+            alpha = 1/sum
+
+            # update gene/trait prob distribution
+            for type in probabilities[person][attribute]:
+                probabilities[person][attribute][type] *= alpha
 
 if __name__ == "__main__":
     main()
