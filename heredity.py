@@ -146,56 +146,56 @@ def joint_probability(people, one_gene, two_genes, have_trait):
         
         # GEN PROBABILITY
         gen_prob = 1
-        # init number of gen(es), = 0 by default for using later
+        # check number of gen(es) of current person, = 0 by default for using later
         copies = 0
-        # If have not parent
+        if person in two_genes:
+            copies = 2
+        elif person in one_gene:
+            copies = 1
+        
+        # Get mother and father(if exist)
         mother = people[person]['mother']
         father = people[person]['father']
-        if mother is None and father is None:
-            if person in two_genes:
-                copies = 2
-            elif person in one_gene:
-                copies = 1
+        # If have not parent -> using probability in PROBS dict
+        if mother == None and father == None:
             gen_prob = PROBS["gene"][copies]
         # Else, having parent -> compute based on conditional on what genes their parents have.
         else:
-            # Compute probability dict reference of getting gen ability from each parent
-            parent_dict = {mother: 1, father: 1}
+            # Compute reference probability dict of getting gen from each parent
+            parent_pass_probs = {mother: 1, father: 1}
             # Consider each mother/father
-            for parent in parent_dict:
+            for parent in parent_pass_probs:
                 # Case having 2 gene -> chance of passing on it = (1-P(mutation))
                 if parent in two_genes:
-                    parent_dict[parent] *= 1 - PROBS["mutation"]
-                # ??? Case having 1 gene -> passing copy gen without mutation + passing non-copy gen with mutation
+                    parent_pass_probs[parent] = 1 - PROBS["mutation"]
+                # ??? Case having 1 gene -> passing copy gen without mutation + passing non-copy gen with mutation = 0.5
                 elif parent in one_gene:
-                    parent_dict[parent] *= 0.5 * (1 - PROBS["mutation"]) #+ 0.5 * PROBS["mutation"]
+                    parent_pass_probs[parent] = 0.5 
                 # Case having 0 gene -> only passing via mutating
                 else:
-                    parent_dict[parent] *= PROBS["mutation"]
+                    parent_pass_probs[parent] = PROBS["mutation"]
 
             # Calculate gen_prob based on parent_prob dict
             # son has 2 gen = P(1_from_mother) * P(1_from_father)
             if person in two_genes:
-                copies = 2
-                gen_prob = parent_dict[mother] * parent_dict[father]
+                gen_prob = parent_pass_probs[mother] * parent_pass_probs[father]
             # son has 1 gen = P(1_from_mother) * P(0_from_father) + vice versa
             elif person in one_gene:
-                copies = 1
                 # 1 from mother, 0 from father
-                prob_1 = parent_dict[mother] * (1 - parent_dict[father]) 
+                prob_1 = parent_pass_probs[mother] * (1 - parent_pass_probs[father]) 
                 # 0 from mother, 1 from father 
-                prob_2 = (1 - parent_dict[mother]) * parent_dict[father]
-                gen_prob *= (prob_1 + prob_2)
+                prob_2 = (1 - parent_pass_probs[mother]) * parent_pass_probs[father]
+                gen_prob = prob_1 + prob_2
             # son has 0 gen, neither from father and mother
             else:
-                gen_prob = (1 - parent_dict[mother]) * (1 - parent_dict[father]) 
+                gen_prob = (1 - parent_pass_probs[mother]) * (1 - parent_pass_probs[father]) 
 
         # TRAIT PROBABILITY base on number of gen(es)
         trait_prob = 1
         if person in have_trait:
-            trait_prob *= PROBS["trait"][copies][True]
+            trait_prob = PROBS["trait"][copies][True]
         else:
-            trait_prob *= PROBS["trait"][copies][False]
+            trait_prob = PROBS["trait"][copies][False]
         
         # update joint probability
         joint_prob *= gen_prob * trait_prob
@@ -210,17 +210,21 @@ def update(probabilities, one_gene, two_genes, have_trait, p):
     Which value for each distribution is updated depends on whether
     the person is in `have_gene` and `have_trait`, respectively.
     """
-    # update person is in one gene 
-    for person in one_gene:
-        probabilities[person]['gene'][1] += p
-    
-    # update person is in two gene
-    for person in two_genes:
-        probabilities[person]['gene'][2] += p
+    # Loop over each person
+    for person in probabilities:
+        # check number of gene to add appropriate value, = 0 by default
+        num_gen = 0
+        if person in two_genes:
+            num_gen = 2
+        elif person in one_gene:
+            num_gen = 1
+        probabilities[person]['gene'][num_gen] += p
 
-    # update person have trait
-    for person in have_trait:
-        probabilities[person]['trait'][True] += p
+        # check trait to add p to appropriate value, = True by default
+        is_trait = True
+        if person not in have_trait:
+            is_trait = False
+        probabilities[person]['trait'][is_trait] += p
 
 def normalize(probabilities):
     """
@@ -232,13 +236,11 @@ def normalize(probabilities):
         # normalize by finding normalizing constant factor alpha
         for attribute in probabilities[person]:
             # finding normalizing constant factor alpha
-            sum = 0
-            for type in probabilities[person][attribute]:
-                sum += probabilities[person][attribute][type]
-
-            if sum == 0:
-                sum = 1
-            alpha = 1/sum
+            list_distrib = list(probabilities[person][attribute].values())
+            sum_distrib = sum(list_distrib)
+            if sum_distrib == 0:
+                sum_distrib = 1
+            alpha = 1/sum_distrib
 
             # update gene/trait prob distribution
             for type in probabilities[person][attribute]:
